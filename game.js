@@ -41,12 +41,55 @@ const worldMap = {
 const locations = {
     dark_room: {
         description: 'You awaken in a cold, dark room. Stone walls press in around you. You feel a damp chill in the air. A single wooden door stands before you.',
+        hints: [
+            'Try searching the room for items that might help.',
+            'Examine objects closely to understand your surroundings.',
+            'You need to find something to unlock the door.'
+        ],
+        solution: {
+            text: 'You gather the three crystal fragments scattered in the darkness. As they come together, they glow brilliantly, forming a key of pure light. The symbols on the door respond to the light, and the lock clicks open.',
+            nextLocation: 'catacombs'
+        },
         commands: {
             'look': 'The room is almost pitch black. You can barely make out the outline of a door.',
             'examine door': 'The door is made of ancient oak, with strange symbols carved into it.',
             'open door': 'The door is locked. You\'ll need to find a way to open it.',
             'search': 'You feel around in the darkness and find a small glowing crystal fragment.',
-            'help': 'Available commands: look, examine [object], search, inventory, help, quit'
+            'help': 'Available commands: look, examine [object], search, inventory, hint, solve, help, quit'
+        }
+    },
+    catacombs: {
+        description: 'You step into ancient catacombs. The air reeks of decay and forgotten magic. Pale blue crystals embedded in the walls cast eerie shadows. A spectral figure materializes before you.',
+        hints: [
+            'The wraith seems bound by duty, not malice.',
+            'Listen to the riddle carefully: "I speak without a mouth and hear without ears."',
+            'The answer is something that comes back to you.'
+        ],
+        solution: {
+            text: 'You speak the word "Echo" with confidence. The wraith shudders and its form becomes clear. "You have freed me from my binding," it whispers. "I am Echo, guardian no more. Pass, heir of Thornwick." The wraith dissipates, and the path forward opens.',
+            nextLocation: 'necromancer_study'
+        },
+        commands: {
+            'look': 'The catacombs stretch into darkness. A ghostly wraith blocks your path.',
+            'examine wraith': 'The wraith speaks: "I speak without a mouth and hear without ears. I have no body, but come alive with fears. Speak my name to pass."',
+            'help': 'Available commands: look, examine [object], inventory, hint, solve, help, quit'
+        }
+    },
+    necromancer_study: {
+        description: 'You enter a chamber filled with arcane artifacts and dusty tomes. This is Mordeth the Soulbinder\'s study. Dark energy still lingers in the air.',
+        hints: [
+            'The journals on the desk might contain valuable information.',
+            'Your Thornwick bloodline is significant.',
+            'Magic can be learned from these texts.'
+        ],
+        solution: {
+            text: 'You decipher Mordeth\'s journals, learning the truth: you were imprisoned because your bloodline can banish the Shadow Lord. As understanding dawns, power awakens within you. Your hands glow with soft light—you\'ve learned your first spell: Luminous Ward.',
+            nextLocation: 'prison_complex'
+        },
+        commands: {
+            'look': 'Books and scrolls cover every surface. A journal lies open on the desk.',
+            'examine journal': 'The journal speaks of the Thornwick bloodline and its power over shadow magic.',
+            'help': 'Available commands: look, examine [object], inventory, hint, solve, help, quit'
         }
     }
 };
@@ -81,6 +124,7 @@ function printWelcome() {
     writeOutput('');
     writeOutput('Type "help" for available commands.', 'info');
     writeOutput('Type "start" to begin your journey.', 'info');
+    writeOutput('Type "hint" if you get stuck, or "solve" to skip a challenge.', 'info');
     writeOutput('');
 }
 
@@ -117,6 +161,57 @@ function handleCommand(command) {
     
     if (command === 'clear' || command === 'cls') {
         output.innerHTML = '';
+        return;
+    }
+    
+    if (command === 'hint') {
+        const location = locations[gameState.location];
+        if (location && location.hints) {
+            if (!gameState.flags[`${gameState.location}_hintIndex`]) {
+                gameState.flags[`${gameState.location}_hintIndex`] = 0;
+            }
+            
+            const hintIndex = gameState.flags[`${gameState.location}_hintIndex`];
+            const hint = location.hints[hintIndex];
+            
+            writeOutput(`💡 Hint: ${hint}`, 'warning');
+            
+            // Cycle through hints
+            gameState.flags[`${gameState.location}_hintIndex`] = (hintIndex + 1) % location.hints.length;
+        } else {
+            writeOutput('No hints available for this location.', 'info');
+        }
+        writeOutput('');
+        return;
+    }
+    
+    if (command === 'solve') {
+        const location = locations[gameState.location];
+        if (location && location.solution) {
+            writeOutput('');
+            writeOutput('=== CHALLENGE SOLVED ===', 'success');
+            writeOutput('');
+            writeOutput(location.solution.text);
+            writeOutput('');
+            
+            // Progress to next location
+            if (location.solution.nextLocation && locations[location.solution.nextLocation]) {
+                gameState.location = location.solution.nextLocation;
+                
+                // Add to discovered locations
+                if (!gameState.discovered.includes(location.solution.nextLocation)) {
+                    gameState.discovered.push(location.solution.nextLocation);
+                }
+                
+                writeOutput('--- JOURNEY CONTINUES ---', 'info');
+                writeOutput('');
+                writeOutput(locations[location.solution.nextLocation].description);
+                drawMap();
+            }
+        } else {
+            writeOutput('There is nothing to solve here.', 'error');
+        }
+        writeOutput('');
         return;
     }
     
