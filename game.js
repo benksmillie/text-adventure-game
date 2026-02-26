@@ -5,7 +5,8 @@ const gameState = {
     location: 'dark_room',
     inventory: [],
     flags: {},
-    discovered: ['dark_room']
+    discovered: ['dark_room'],
+    combat: null
 };
 
 const worldMap = {
@@ -91,6 +92,28 @@ const locations = {
             'examine journal': 'The journal speaks of the Thornwick bloodline and its power over shadow magic.',
             'help': 'Available commands: look, examine [object], inventory, hint, solve, help, quit'
         }
+    },
+    prison_complex: {
+        description: 'You reach a larger fortress chamber. A jailor wraith materializes, its eyes burning with malice. "None shall pass!" it shrieks, drawing a spectral blade.',
+        hints: [
+            'You must defeat the jailor wraith in combat.',
+            'Use the "challenge" command to engage in battle.',
+            'Each attack deals 1-20 damage randomly.'
+        ],
+        enemy: {
+            name: 'Jailor Wraith',
+            hp: 50,
+            maxHp: 50
+        },
+        solution: {
+            text: 'With a final strike, the jailor wraith dissolves into mist. Its keys clatter to the ground. You\'ve proven yourself in combat and can now escape toward the surface.',
+            nextLocation: 'ashenmoor'
+        },
+        commands: {
+            'look': 'A fierce jailor wraith guards the passage ahead.',
+            'examine wraith': 'The jailor wraith grips a spectral blade. It looks dangerous. HP: 50',
+            'help': 'Available commands: look, examine [object], challenge, inventory, hint, solve, help, quit'
+        }
     }
 };
 
@@ -134,6 +157,12 @@ function handleCommand(command) {
     if (!command) return;
     
     writeCommand(command);
+    
+    // Check if in combat
+    if (gameState.combat) {
+        handleCombat(command);
+        return;
+    }
     
     // Global commands
     if (command === 'quit' || command === 'exit') {
@@ -215,6 +244,31 @@ function handleCommand(command) {
         return;
     }
     
+    if (command === 'challenge') {
+        const location = locations[gameState.location];
+        if (location && location.enemy) {
+            if (!gameState.combat) {
+                // Initialize combat
+                gameState.combat = {
+                    enemy: location.enemy.name,
+                    enemyHp: location.enemy.hp,
+                    enemyMaxHp: location.enemy.maxHp
+                };
+                writeOutput('');
+                writeOutput(`⚔️  COMBAT INITIATED WITH ${location.enemy.name.toUpperCase()} ⚔️`, 'warning');
+                writeOutput('');
+                writeOutput(`Enemy HP: ${gameState.combat.enemyHp}/${gameState.combat.enemyMaxHp}`, 'error');
+                writeOutput('');
+                writeOutput('Type "attack" to strike, or "flee" to retreat.', 'info');
+                writeOutput('');
+            }
+        } else {
+            writeOutput('There is no one to challenge here.', 'error');
+            writeOutput('');
+        }
+        return;
+    }
+    
     // Location-specific commands
     const location = locations[gameState.location];
     if (location && location.commands[command]) {
@@ -231,6 +285,55 @@ function handleCommand(command) {
     }
     
     writeOutput('');
+}
+
+function handleCombat(command) {
+    if (command === 'attack') {
+        const damage = Math.floor(Math.random() * 20) + 1;
+        gameState.combat.enemyHp -= damage;
+        
+        writeOutput(`You strike! Dealt ${damage} damage.`, 'success');
+        writeOutput(`Enemy HP: ${Math.max(0, gameState.combat.enemyHp)}/${gameState.combat.enemyMaxHp}`, 'error');
+        writeOutput('');
+        
+        if (gameState.combat.enemyHp <= 0) {
+            writeOutput(`🏆 VICTORY! You defeated the ${gameState.combat.enemy}!`, 'success');
+            writeOutput('');
+            
+            const location = locations[gameState.location];
+            if (location.solution) {
+                writeOutput(location.solution.text);
+                writeOutput('');
+                
+                if (location.solution.nextLocation && locations[location.solution.nextLocation]) {
+                    gameState.location = location.solution.nextLocation;
+                    
+                    if (!gameState.discovered.includes(location.solution.nextLocation)) {
+                        gameState.discovered.push(location.solution.nextLocation);
+                    }
+                    
+                    writeOutput('--- JOURNEY CONTINUES ---', 'info');
+                    writeOutput('');
+                    writeOutput(locations[location.solution.nextLocation].description);
+                    drawMap();
+                }
+            }
+            
+            gameState.combat = null;
+            writeOutput('');
+        } else {
+            const enemyDamage = Math.floor(Math.random() * 10) + 1;
+            writeOutput(`The ${gameState.combat.enemy} retaliates! You take ${enemyDamage} damage.`, 'warning');
+            writeOutput('');
+        }
+    } else if (command === 'flee') {
+        writeOutput(`You retreat from the ${gameState.combat.enemy}!`, 'warning');
+        writeOutput('');
+        gameState.combat = null;
+    } else {
+        writeOutput('In combat, use: attack, flee', 'info');
+        writeOutput('');
+    }
 }
 
 // Event listeners
